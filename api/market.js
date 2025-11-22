@@ -1,37 +1,40 @@
-// api/market.js
 
-export default async function handler(req, res) {
+// market.js - Fixed live data fetching using Polygon API
+
+const axios = require("axios");
+
+module.exports = async (req, res) => {
   try {
-    const indices = [
-      {
-        id: "spx",
-        name: "S&P 500",
-        symbol: "SPX",
-        price: 5120.50,
-        change: 18.3,
-        changePercent: 0.36
-      },
-      {
-        id: "ndx",
-        name: "Nasdaq 100",
-        symbol: "NDX",
-        price: 17980.20,
-        change: -25.4,
-        changePercent: -0.14
-      },
-      {
-        id: "dji",
-        name: "Dow Jones",
-        symbol: "DJI",
-        price: 38950.10,
-        change: 95.6,
-        changePercent: 0.25
-      }
+    const indexes = [
+      { symbol: "SPX", name: "S&P 500" },
+      { symbol: "NDX", name: "Nasdaq 100" },
+      { symbol: "DJI", name: "Dow Jones" }
     ];
 
-    res.status(200).json(indices);
+    const results = [];
+
+    for (const idx of indexes) {
+      const url = `https://api.polygon.io/v2/aggs/ticker/I:${idx.symbol}/prev?apiKey=${process.env.POLYGON_API_KEY}`;
+      const response = await axios.get(url);
+      const data = response.data;
+
+      if (!data.results || data.results.length === 0) continue;
+
+      const agg = data.results[0];
+
+      results.push({
+        id: idx.symbol.toLowerCase(),
+        name: idx.name,
+        symbol: idx.symbol,
+        price: agg.c,
+        change: agg.c - agg.o,
+        changePercent: ((agg.c - agg.o) / agg.o) * 100
+      });
+    }
+
+    res.json(results);
   } catch (err) {
-    console.error("market error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Market route error:", err);
+    res.status(500).json({ error: "Failed to load market data" });
   }
-}
+};
